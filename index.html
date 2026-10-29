@@ -56,6 +56,7 @@
 }
 .track:last-child { border-bottom: none; } /* Removes line from the very last song */
 .track:hover, .track.active { background: #1a1a1a; }
+.track { padding: 6px 10px; }
     .track-cover {
       width: 60px; height: 60px; border-radius: 8px;
       object-fit: cover; background: #333; flex-shrink: 0;
@@ -322,7 +323,7 @@
 
     async function loadTracks() {
       try {
-        trackListEl.innerHTML = '<div class="loading">Loading tracks…</div>';
+        if (!trackListEl.querySelector('.track')) trackListEl.innerHTML = '<div class="loading">Loading tracks…</div>';
 
         const { data, error } = await db
           .from('tracks')
@@ -600,7 +601,7 @@
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) loadTracks();
     });
-    window.addEventListener('focus', loadTracks);
+    // reload on focus removed: it ate the first tap
 
     // bring back the last played song
     try {
