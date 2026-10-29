@@ -175,6 +175,26 @@
     .sheet-action:active { background: #262626; }
     .sheet-action svg { width: 24px; height: 24px; fill: #fff; flex-shrink: 0; }
     .sheet-action .label { font-size: 15px; font-weight: 600; }
+    .mini-player { touch-action: none; transition: transform 0.3s ease, opacity 0.3s ease; }
+    .mini-player.hide { transform: translateY(120px); opacity: 0; pointer-events: none; }
+    .full-player {
+      position: fixed; inset: 0; z-index: 1000;
+      background: linear-gradient(180deg, #1f1f1f 0%, #121212 60%);
+      display: flex; flex-direction: column; align-items: center;
+      padding: 14px 28px 40px; touch-action: none;
+      transform: translateY(100%);
+      transition: transform 0.35s cubic-bezier(0.22, 0.8, 0.3, 1);
+    }
+    .full-player { clip-path: none; }
+    .full-player.open { transform: translateY(0); clip-path: none; }
+    .fp-handle { width: 40px; height: 4px; background: #444; border-radius: 999px; margin: 6px 0 20px; }
+    .fp-cover { width: 100%; max-width: 340px; aspect-ratio: 1; border-radius: 16px; object-fit: cover; background: #333; margin-top: 16px; }
+    .fp-title { font-size: 22px; font-weight: 800; margin-top: 28px; width: 100%; }
+    .fp-artist { font-size: 15px; color: #b3b3b3; margin-top: 6px; width: 100%; }
+    .fp-seek { width: 100%; margin-top: 28px; accent-color: #e91e63; }
+    .fp-times { display: flex; justify-content: space-between; width: 100%; font-size: 11px; color: #888; margin-top: 4px; }
+    .fp-play { margin-top: 28px; width: 70px; height: 70px; border-radius: 50%; background: #fff; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    .fp-play svg { width: 30px; height: 30px; fill: #000; }
   </style>
 </head>
 <body>
@@ -190,7 +210,7 @@
   <section class="section">
     <div class="section-header">
       <h2>Top Songs</h2>
-      <button class="refresh-btn" id="refresh-btn">↻ Refresh</button>
+      <button class="refresh-btn" id="refresh-btn" style="display:none">↻ Refresh</button>
     </div>
     <div id="track-list">
       <div class="loading">Loading tracks…</div>
@@ -249,6 +269,18 @@
       <svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 100-6 3 3 0 00-3 3c0 .24.04.47.09.7L8.04 9.81A3 3 0 103 12c0 1.66 1.34 3 3 3 .79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65a2.92 2.92 0 105.92 0 2.92 2.92 0 00-2.92-2.92z"/></svg>
       <div class="label">Share</div>
     </div>
+  </div>
+
+  <div class="full-player" id="full-player">
+    <div class="fp-handle"></div>
+    <img class="fp-cover" id="fp-cover" src="" alt="">
+    <div class="fp-title" id="fp-title">No track playing</div>
+    <div class="fp-artist" id="fp-artist">—</div>
+    <input class="fp-seek" id="fp-seek" type="range" min="0" max="100" value="0" step="0.1">
+    <div class="fp-times"><span id="fp-cur">0:00</span><span id="fp-dur">0:00</span></div>
+    <button class="fp-play" id="fp-play" aria-label="Play">
+      <svg id="fp-icon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+    </button>
   </div>
 
   <audio id="audio" preload="metadata"></audio>
@@ -350,6 +382,7 @@
       if (el) el.classList.add('active');
 
       currentTrack = track;
+      try { localStorage.setItem('dropplay_last', JSON.stringify({ track: track, artistName: artistName, cover: cover })); localStorage.setItem('dropplay_time', '0'); } catch (e) {}
       audioEl.src = track.audio_url;
       audioEl.play();
       isPlaying = true;
@@ -454,10 +487,141 @@
     });
 
     refreshBtn.addEventListener('click', loadTracks);
+
+    // ===== BIG PLAYER =====
+    const fullPlayer = document.getElementById('full-player');
+    const miniPlayer = document.getElementById('mini-player');
+    const fpCover = document.getElementById('fp-cover');
+    const fpTitle = document.getElementById('fp-title');
+    const fpArtist = document.getElementById('fp-artist');
+    const fpSeek = document.getElementById('fp-seek');
+    const fpCur = document.getElementById('fp-cur');
+    const fpDur = document.getElementById('fp-dur');
+    const fpPlay = document.getElementById('fp-play');
+    const fpIcon = document.getElementById('fp-icon');
+    let fpOpen = false;
+    let justDragged = false;
+
+    function fmtTime(s) {
+      if (!s || isNaN(s)) return '0:00';
+      const m = Math.floor(s / 60);
+      const r = Math.floor(s % 60);
+      return m + ':' + (r < 10 ? '0' : '') + r;
+    }
+
+    function syncFull() {
+      fpCover.src = playerCover.src;
+      fpTitle.textContent = playerTitle.textContent;
+      fpArtist.textContent = playerArtist.textContent;
+      fpIcon.innerHTML = audioEl.paused ? PLAY_SVG : PAUSE_SVG;
+      fpCur.textContent = fmtTime(audioEl.currentTime);
+      fpDur.textContent = fmtTime(audioEl.duration);
+      if (audioEl.duration) fpSeek.value = (audioEl.currentTime / audioEl.duration) * 100;
+    }
+    ['play', 'pause', 'loadedmetadata', 'timeupdate', 'ended'].forEach(ev => audioEl.addEventListener(ev, syncFull));
+
+    fpSeek.addEventListener('input', () => {
+      if (audioEl.duration) audioEl.currentTime = (fpSeek.value / 100) * audioEl.duration;
+    });
+    fpPlay.addEventListener('click', () => playBtn.click());
+
+    function setOrigin() {
+      const b = playBtn.getBoundingClientRect();
+      fullPlayer.style.setProperty('--px', (b.left + b.width / 2) + 'px');
+      fullPlayer.style.setProperty('--py', (b.top + b.height / 2) + 'px');
+    }
+    function setFull(open) {
+      fpOpen = open;
+      setOrigin();
+      fullPlayer.style.transition = '';
+      fullPlayer.style.transform = '';
+      miniPlayer.style.transition = '';
+      miniPlayer.style.transform = '';
+      miniPlayer.style.opacity = '';
+      miniPlayer.classList.toggle('hide', open);
+      fullPlayer.classList.toggle('open', open);
+      if (open) syncFull();
+    }
+    function oldSetFull(open) {
+      fpOpen = open;
+      fullPlayer.style.transition = '';
+      fullPlayer.style.transform = '';
+      fullPlayer.classList.toggle('open', open);
+      if (open) syncFull();
+    }
+
+    function addDrag(el) {
+      let startY = 0, dy = 0, dragging = false, moved = false;
+      el.addEventListener('touchstart', e => {
+        if (e.target.closest('input')) return;
+        if (!fpOpen && !currentTrack) return;
+        startY = e.touches[0].clientY;
+        dy = 0; moved = false; dragging = true;
+        fullPlayer.style.transition = 'none';
+        if (!fpOpen) syncFull();
+      }, { passive: true });
+      el.addEventListener('touchmove', e => {
+        if (!dragging) return;
+        dy = e.touches[0].clientY - startY;
+        if (Math.abs(dy) > 6) moved = true;
+        const h = window.innerHeight;
+                const pos = fpOpen ? Math.max(0, dy) : Math.max(0, (h - 68 - miniPlayer.offsetHeight) + dy);
+        const b = playBtn.getBoundingClientRect();
+        const R = Math.hypot(window.innerWidth, h);
+        const prog = Math.max(0, Math.min(1, fpOpen ? 1 - Math.max(0, dy) / (h * 0.6) : -dy / (h * 0.6)));
+        fullPlayer.style.transform = 'translateY(' + Math.min(pos, h) + 'px)';
+        const p = 1 - Math.min(pos, h) / h;
+        miniPlayer.style.transition = 'none';
+        miniPlayer.style.transform = 'translateY(' + (p * 120) + 'px)';
+        miniPlayer.style.opacity = String(1 - p);
+      }, { passive: true });
+      el.addEventListener('touchend', () => {
+        if (!dragging) return;
+        dragging = false;
+        if (moved) {
+          justDragged = true;
+          setTimeout(() => { justDragged = false; }, 300);
+          setFull(fpOpen ? !(dy > 80) : dy < -60);
+        } else {
+          setFull(fpOpen);
+        }
+      }, { passive: true });
+    }
+    addDrag(miniPlayer);
+    addDrag(fullPlayer);
+
+    miniPlayer.addEventListener('click', () => {
+      if (justDragged || !currentTrack) return;
+      fullPlayer.style.transition = 'none';
+      fullPlayer.style.transform = 'translateY(' + miniPlayer.getBoundingClientRect().top + 'px)';
+      void fullPlayer.offsetHeight;
+      setFull(true);
+    });
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) loadTracks();
     });
     window.addEventListener('focus', loadTracks);
+
+    // bring back the last played song
+    try {
+      const last = JSON.parse(localStorage.getItem('dropplay_last') || 'null');
+      if (last && last.track && last.track.audio_url) {
+        currentTrack = last.track;
+        audioEl.src = last.track.audio_url;
+        playerCover.src = last.cover;
+        playerTitle.textContent = last.track.title;
+        playerArtist.textContent = last.artistName;
+        setPlayIcon(false);
+        isPlaying = false;
+        const t = parseFloat(localStorage.getItem('dropplay_time') || '0');
+        audioEl.addEventListener('loadedmetadata', () => {
+          if (t > 0 && t < audioEl.duration - 1) audioEl.currentTime = t;
+        }, { once: true });
+      }
+    } catch (e) {}
+    audioEl.addEventListener('timeupdate', () => {
+      try { localStorage.setItem('dropplay_time', String(audioEl.currentTime)); } catch (e) {}
+    });
 
     loadTracks();
   </script>
