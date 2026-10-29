@@ -409,11 +409,9 @@
   </nav>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
   <script>
-    const SUPABASE_URL = 'https://jzmoquqwsymxmkqgxiys.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_WugzrmPmu9M_SyKiKJX7Hw_RWw9MQIJ';
-    const { createClient } = supabase;
-    const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // Supabase is connected via config.js
     const FALLBACK = 'https://via.placeholder.com/60/333/fff?text=♪';
 
     // ===== Tabs =====
@@ -586,7 +584,7 @@
         const { error } = await db.from('tracks').insert({
           title,
           artist_id: artistId,
-          album_id: albumId ? parseInt(albumId) : null,
+          album_id: albumId ? albumId : null,
           audio_url: audioUrl,
           cover_url: coverUrl
         });

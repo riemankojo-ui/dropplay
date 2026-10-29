@@ -1,5 +1,5 @@
 // ================================
-// DROPLAY — Main App Logic
+// DROPPLAY — Main App Logic
 // ================================
 
 const { createClient } = supabase;
