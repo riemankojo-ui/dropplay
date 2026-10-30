@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "app.vercel.dropplay_lake.twa",
+        "sha256_cert_fingerprints": ["7C:AB:DC:2B:A8:2A:9A:E0:71:12:8E:A5:36:AC:BF:F9:3B:C8:CF:DD:FE:F0:AA:C0:11:EF:6B:75:E5:9A:6D:CB"]
+      }
+    }]
