@@ -9,8 +9,32 @@
   <link rel="apple-touch-icon" href="icon-192.png">
   <title>Dropplay</title>
   <link rel="stylesheet" href="styl.css">
+  <style>
+    #splash{position:fixed;inset:0;z-index:99999;background:#121212;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;transition:opacity .35s}
+    #splash.hide{opacity:0;pointer-events:none}
+    #splash svg{width:96px;height:96px}
+    #splash .line{width:120px;height:3px;background:#2a2a2a;border-radius:3px;overflow:hidden}
+    #splash .line i{display:block;width:40%;height:100%;background:#FFD60A;animation:sp 1s ease-in-out infinite}
+    @keyframes sp{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}
+  </style>
+  <style>
+    #splash{position:fixed;inset:0;z-index:99999;background:#121212;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;transition:opacity .35s}
+    #splash.hide{opacity:0;pointer-events:none}
+    #splash svg{width:96px;height:96px}
+    #splash .line{width:120px;height:3px;background:#2a2a2a;border-radius:3px;overflow:hidden}
+    #splash .line i{display:block;width:40%;height:100%;background:#FFD60A;animation:sp 1s ease-in-out infinite}
+    @keyframes sp{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}
+  </style>
 </head>
 <body>
+  <div id="splash">
+    <svg viewBox="0 0 100 100"><path fill="#FFD60A" fill-rule="evenodd" d="M24 18H52C74 18 86 32 86 50C86 68 74 82 52 82H24ZM42 35V65H50C60 65 68 59 68 50C68 41 60 35 50 35Z"/></svg>
+    <div class="line"><i></i></div>
+  </div>
+  <div id="splash">
+    <svg viewBox="0 0 100 100"><path fill="#FFD60A" fill-rule="evenodd" d="M24 18H52C74 18 86 32 86 50C86 68 74 82 52 82H24ZM42 35V65H50C60 65 68 59 68 50C68 41 60 35 50 35Z"/></svg>
+    <div class="line"><i></i></div>
+  </div>
 
   <!-- ================= HOME ================= -->
   <section class="view active" id="view-home">
@@ -231,6 +255,14 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="app.js"></script>
   <script>
+    window.addEventListener('load', () => {
+      const s = document.getElementById('splash');
+      if (s) { s.classList.add('hide'); setTimeout(() => s.remove(), 400); }
+    });
+    window.addEventListener('load', () => {
+      const s = document.getElementById('splash');
+      if (s) { s.classList.add('hide'); setTimeout(() => s.remove(), 400); }
+    });
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
     }
