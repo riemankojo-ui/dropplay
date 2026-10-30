@@ -267,5 +267,17 @@
       window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
     }
   </script>
+<script>
+  (function () {
+    function hideSplash() {
+      var s = document.getElementById('splash');
+      if (!s) return;
+      s.classList.add('hide');
+      setTimeout(function () { if (s.parentNode) s.parentNode.removeChild(s); }, 400);
+    }
+    requestAnimationFrame(function () { setTimeout(hideSplash, 500); });
+    setTimeout(hideSplash, 2500);
+  })();
+</script>
 </body>
 </html>

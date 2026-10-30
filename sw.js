@@ -1,4 +1,4 @@
-const CACHE = 'dropplay-v3';
+const CACHE = 'dropplay-v4';
 const SHELL = ['./', 'index.html', 'styl.css', 'app.js', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', (e) => {
