@@ -1,6 +1,10 @@
 {
   "name": "Dropplay",
   "short_name": "Dropplay",
+"id": "/",
+"description": "Play and upload music with Dropplay.",
+"orientation": "portrait",
+"categories": ["music", "entertainment"],
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
