@@ -95,7 +95,7 @@ function markActive() {
 }
 
 async function countPlay(track) {
-  if (!track || !track.id) return;
+  if (!track || !track.id || track.local) return;
   try {
     let plays = track.plays;
     if (typeof plays !== 'number') {
@@ -108,6 +108,14 @@ async function countPlay(track) {
 }
 
 function playTrack(track, artistName, cover) {
+  // Songs added from the phone: open the saved file first, then play it
+  if (track.local && !track.ready) {
+    resolveLocalUrl(track.id).then((url) => {
+      if (!url) { toast('Could not open this song. Add it again.'); return; }
+      playTrack(Object.assign({}, track, { audio_url: url, ready: true }), artistName, cover);
+    }).catch(() => toast('Could not open this song. Add it again.'));
+    return;
+  }
   if (!track.audio_url) { toast('This song has no audio file yet.'); return; }
 
   currentTrack = track;
@@ -118,7 +126,7 @@ function playTrack(track, artistName, cover) {
   playerTitle.textContent = track.title || 'Untitled';
   playerArtist.textContent = artistName;
 
-  store('dropplay_last', JSON.stringify({ track, artistName, cover }));
+  store('dropplay_last', JSON.stringify({ track: track.local ? Object.assign({}, track, { audio_url: '' }) : track, artistName, cover }));
   store('dropplay_time', '0');
 
   markActive();
@@ -244,10 +252,98 @@ function getLibrary() {
 }
 function saveLibrary(list) { store(LIB_KEY, JSON.stringify(list)); }
 
+// ===== Songs from this phone (a copy is kept inside the app) =====
+const LOCAL_KEY = 'dropplay_local';
+function getLocalList() {
+  try { return JSON.parse(read(LOCAL_KEY) || '[]'); } catch (e) { return []; }
+}
+function saveLocalList(list) { store(LOCAL_KEY, JSON.stringify(list)); }
+
+function openLocalDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('dropplay_local_songs', 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('files');
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function localFileOp(mode, run) {
+  const idb = await openLocalDb();
+  return new Promise((resolve, reject) => {
+    const tx = idb.transaction('files', mode);
+    const req = run(tx.objectStore('files'));
+    tx.oncomplete = () => resolve(req ? req.result : undefined);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+const putLocalFile = (id, blob) => localFileOp('readwrite', (s) => s.put(blob, id));
+const getLocalFile = (id) => localFileOp('readonly', (s) => s.get(id));
+const deleteLocalFile = (id) => localFileOp('readwrite', (s) => s.delete(id));
+
+let localUrl = null;
+async function resolveLocalUrl(id) {
+  const blob = await getLocalFile(id);
+  if (!blob) return null;
+  if (localUrl) URL.revokeObjectURL(localUrl);
+  localUrl = URL.createObjectURL(blob);
+  return localUrl;
+}
+
+function renderLocal() {
+  const wrap = $('lib-local');
+  if (!wrap) return;
+  const list = getLocalList();
+  wrap.innerHTML = '';
+  if (list.length === 0) {
+    wrap.innerHTML = '<div class="empty">No songs from this phone yet.<br>Tap <b>Add songs</b> to pick some.</div>';
+    return;
+  }
+  list.forEach((item) => {
+    wrap.appendChild(buildRow(item, 'On this phone', FALLBACK, () => {
+      if (!confirm('Remove "' + (item.title || 'this song') + '" from Dropplay? The original file on your phone stays.')) return;
+      deleteLocalFile(item.id).catch(() => {});
+      saveLocalList(getLocalList().filter((t) => t.id !== item.id));
+      renderLibrary();
+    }));
+  });
+  markActive();
+}
+
+$('add-local-btn').addEventListener('click', () => $('local-input').click());
+$('local-input').addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files || []);
+  e.target.value = '';
+  if (!files.length) return;
+  toast('Adding ' + files.length + (files.length === 1 ? ' song…' : ' songs…'));
+  const list = getLocalList();
+  let added = 0;
+  for (const f of files) {
+    if (f.type && f.type.indexOf('audio') !== 0) continue;
+    if (list.some((t) => t.name === f.name && t.size === f.size)) continue;
+    const id = 'local-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+    try {
+      await putLocalFile(id, f);
+      list.push({ id, local: true, title: f.name.replace(/\.[^.]+$/, ''), name: f.name, size: f.size, added: Date.now() });
+      added++;
+    } catch (err) {
+      console.error(err);
+      toast('Could not save. Check the free space on your phone.');
+      break;
+    }
+  }
+  saveLocalList(list);
+  renderLibrary();
+  if (added) toast(added + (added === 1 ? ' song added' : ' songs added'));
+  else toast('Nothing new to add.');
+});
+
 function renderLibrary() {
   const list = getLibrary();
   const wrap = $('lib-list');
-  $('count-pill').textContent = list.length + (list.length === 1 ? ' song' : ' songs');
+  const total = list.length + getLocalList().length;
+  $('count-pill').textContent = total + (total === 1 ? ' song' : ' songs');
+  renderLocal();
 
   if (list.length === 0) {
     wrap.innerHTML = `
