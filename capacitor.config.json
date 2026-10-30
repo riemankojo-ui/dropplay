@@ -1,0 +1,7 @@
+{
+  "appId": "com.dropplay.app",
+  "appName": "Dropplay",
+  "webDir": "www",
+  "backgroundColor": "#121212",
+  "server": { "androidScheme": "https" }
+}
