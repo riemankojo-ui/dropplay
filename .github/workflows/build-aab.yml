@@ -1,0 +1,146 @@
+name: Build AAB
+on:
+  workflow_dispatch:
+    inputs:
+      app_name:
+        description: App name
+        required: true
+        default: App
+      app_id:
+        description: Package ID
+        required: true
+        default: com.example.app
+      version:
+        description: Version
+        required: true
+        default: 1.0.0
+permissions:
+  contents: write
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    env:
+      APP_NAME: ${{ inputs.app_name }}
+      APP_ID: ${{ inputs.app_id }}
+      VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Prepare web files
+        run: |
+          mkdir -p "$RUNNER_TEMP/www"
+          if [ -f package.json ] && grep -q '"build"' package.json; then
+            npm install
+            npm run build
+            if [ -d dist ]; then cp -r dist/. "$RUNNER_TEMP/www/"; else cp -r build/. "$RUNNER_TEMP/www/"; fi
+          else
+            tar --exclude=.git --exclude=.github -cf - . | tar -xf - -C "$RUNNER_TEMP/www"
+          fi
+      - name: Create Android project
+        run: |
+          mkdir "$RUNNER_TEMP/cap"
+          cd "$RUNNER_TEMP/cap"
+          npm init -y
+          npm install @capacitor/core@8 @capacitor/cli@8 @capacitor/android@8
+          mv "$RUNNER_TEMP/www" www
+          npx cap init "$APP_NAME" "$APP_ID" --web-dir www
+          npx cap add android
+          if [ -f "$GITHUB_WORKSPACE/FolderAccessPlugin.java" ]; then
+            PKG_DIR="android/app/src/main/java/$(echo "$APP_ID" | tr . /)"
+            mkdir -p "$PKG_DIR"
+            sed "s/^package .*/package $APP_ID;/" "$GITHUB_WORKSPACE/FolderAccessPlugin.java" > "$PKG_DIR/FolderAccessPlugin.java"
+            printf '%s\n' "package $APP_ID;" "" "import android.os.Bundle;" "import com.getcapacitor.BridgeActivity;" "" "public class MainActivity extends BridgeActivity {" "    @Override" "    public void onCreate(Bundle savedInstanceState) {" "        registerPlugin(FolderAccessPlugin.class);" "        super.onCreate(savedInstanceState);" "    }" "}" > "$PKG_DIR/MainActivity.java"
+          fi
+          npx cap sync android
+          sed -i "s/versionName \".*\"/versionName \"$VERSION\"/; s/versionCode [0-9]*/versionCode ${{ github.run_number }}/" android/app/build.gradle
+      - name: Get or create upload key
+        run: |
+          mkdir -p "$RUNNER_TEMP/ks"
+          cd "$RUNNER_TEMP/ks"
+          REPO="${{ github.repository }}"
+          NAME="Upload key ($APP_ID)"
+          REL=$(gh api "repos/$REPO/releases?per_page=100" --jq ".[] | select(.draft and .name==\"$NAME\") | .id" | head -1)
+          if [ -n "$REL" ]; then
+            echo "Using saved upload key"
+            for F in signing.keystore key-password.txt; do
+              AID=$(gh api "repos/$REPO/releases/$REL" --jq ".assets[] | select(.name==\"$F\") | .id")
+              gh api -H "Accept: application/octet-stream" "repos/$REPO/releases/assets/$AID" > "$F"
+            done
+          else
+            echo "Creating a new upload key"
+            openssl rand -hex 16 > key-password.txt
+            keytool -genkeypair -v -keystore signing.keystore -alias upload -keyalg RSA -keysize 2048 -validity 10000 -storepass "$(cat key-password.txt)" -keypass "$(cat key-password.txt)" -dname "CN=$APP_NAME, O=$APP_NAME, C=US"
+            gh release create "upload-key-$APP_ID" signing.keystore key-password.txt --draft --title "$NAME" --notes "Private signing key for $APP_ID. Keep this draft. Do not publish it." --target "$GITHUB_SHA"
+          fi
+          echo "KS_FILE=$RUNNER_TEMP/ks/signing.keystore" >> "$GITHUB_ENV"
+          echo "KS_PASS=$(cat key-password.txt)" >> "$GITHUB_ENV"
+      - name: Add signing to Gradle
+        run: |
+          cd "$RUNNER_TEMP/cap/android"
+          python3 - <<'PY'
+          import re
+          p='app/build.gradle'
+          s=open(p).read()
+          sc="    signingConfigs {\n        release {\n            storeFile file(System.getenv('KS_FILE'))\n            storePassword System.getenv('KS_PASS')\n            keyAlias 'upload'\n            keyPassword System.getenv('KS_PASS')\n        }\n    }\n"
+          s=s.replace("    buildTypes {", sc+"    buildTypes {",1)
+          s=re.sub(r'(buildTypes\s*\{\s*release\s*\{)', r'\1\n            signingConfig signingConfigs.release', s, count=1)
+          open(p,'w').write(s)
+          PY
+          grep -n "signingConfig" app/build.gradle
+      - name: Build AAB
+        run: |
+          cd "$RUNNER_TEMP/cap/android"
+          chmod +x gradlew
+          ./gradlew bundleRelease
+      - name: Make store files
+        run: |
+          OUT="$RUNNER_TEMP/out"
+          mkdir -p "$OUT"
+          cp "$RUNNER_TEMP/cap/android/app/build/outputs/bundle/release/app-release.aab" "$OUT/app.aab"
+          FP=$(keytool -list -v -keystore "$KS_FILE" -alias upload -storepass "$KS_PASS" | grep 'SHA256:' | head -1 | sed 's/.*SHA256: *//')
+          cat > "$OUT/assetlinks.json" <<EOF
+          [{
+            "relation": ["delegate_permission/common.handle_all_urls"],
+            "target": {
+              "namespace": "android_app",
+              "package_name": "$APP_ID",
+              "sha256_cert_fingerprints": ["$FP"]
+            }
+          }]
+          EOF
+          cat > "$OUT/readme.html" <<EOF
+          <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>$APP_NAME release files</title>
+          <style>body{font-family:system-ui,sans-serif;max-width:640px;margin:24px auto;padding:0 16px;line-height:1.6;color:#111}code{background:#eee;padding:2px 6px;border-radius:6px;word-break:break-all}</style></head><body>
+          <h1>$APP_NAME $VERSION</h1>
+          <p>Package ID: <code>$APP_ID</code></p>
+          <h2>Files</h2>
+          <ul>
+          <li><b>app.aab</b>: the signed bundle you upload to Google Play.</li>
+          <li><b>signing.keystore</b>: your upload key. Keep it safe and never share it. Alias: <code>upload</code>. The password is in <b>key-password.txt</b>. Both are saved in the private draft release named Upload key ($APP_ID) in this repo. Do not delete or publish that draft.</li>
+          <li><b>assetlinks.json</b>: for app links. Host it at <code>https://your-domain/.well-known/assetlinks.json</code>.</li>
+          </ul>
+          <h2>Upload to Google Play</h2>
+          <ol>
+          <li>Open Play Console, create your app, then go to Production (or Internal testing) and create a release.</li>
+          <li>Turn on Play App Signing when asked, then upload <b>app.aab</b>.</li>
+          <li>Fill in the store listing: icon 512x512, feature graphic 1024x500, at least 2 screenshots, descriptions, privacy policy URL, content rating and data safety form.</li>
+          </ol>
+          <h2>Fingerprint</h2>
+          <p>Upload key SHA-256: <code>$FP</code></p>
+          <p>Once Play App Signing is on, Google signs the app you install from the store with its own key. If you use app links, put the SHA-256 shown in Play Console under App integrity into assetlinks.json as well.</p>
+          </body></html>
+          EOF
+      - name: Publish release
+        run: |
+          OUT="$RUNNER_TEMP/out"
+          gh release create "aab-${{ github.run_number }}" "$OUT/app.aab" "$OUT/assetlinks.json" "$OUT/readme.html" --title "AAB build ${{ github.run_number }}" --notes "$APP_NAME $VERSION" --target "$GITHUB_SHA"
