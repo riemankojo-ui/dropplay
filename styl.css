@@ -85,6 +85,20 @@ button { font-family: inherit; }
 .track-menu-btn.remove svg { width: 20px; height: 20px; fill: #888; }
 .track-menu-btn.remove:hover svg { fill: #e91e63; }
 
+/* ===== Album / Playlist cards ===== */
+.card-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+.card { cursor: pointer; min-width: 0; }
+.card-cover { width: 100%; aspect-ratio: 1; border-radius: 10px; object-fit: cover; background: #333; display: block; }
+.card-title { font-weight: 700; font-size: 14px; margin-top: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-sub { font-size: 12px; color: #b3b3b3; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.detail-back { background: none; border: 0; padding: 6px; margin-bottom: 8px; cursor: pointer; }
+.detail-back svg { width: 24px; height: 24px; fill: #fff; display: block; }
+.detail-head { text-align: center; padding: 4px 0 18px; }
+.detail-cover { width: 62%; max-width: 260px; aspect-ratio: 1; border-radius: 12px; object-fit: cover; background: #333; }
+.detail-kind { font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase; color: #888; margin-top: 14px; }
+.detail-title { font-size: 22px; font-weight: 800; margin-top: 4px; }
+.detail-sub { font-size: 13px; color: #b3b3b3; margin-top: 4px; }
+
 /* ===== Library ===== */
 .top-bar {
   position: sticky; top: 0; z-index: 20;

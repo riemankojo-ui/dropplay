@@ -50,6 +50,24 @@
       <div class="section-header"><h2>Top Songs</h2></div>
       <div id="track-list"><div class="loading">Loading tracks…</div></div>
     </div>
+    <div class="section" id="home-album" hidden>
+      <div class="section-header"><h2>Albums</h2></div>
+      <div class="card-grid" id="album-grid"></div>
+    </div>
+    <div class="section" id="home-playlist" hidden>
+      <div class="section-header"><h2>Playlists</h2></div>
+      <div class="card-grid" id="playlist-grid"></div>
+    </div>
+    <div class="section" id="home-detail" hidden>
+      <button class="detail-back" id="detail-back" aria-label="Back"><svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></button>
+      <div class="detail-head">
+        <img class="detail-cover" id="detail-cover" alt="">
+        <div class="detail-kind" id="detail-kind"></div>
+        <div class="detail-title" id="detail-title"></div>
+        <div class="detail-sub" id="detail-sub"></div>
+      </div>
+      <div id="detail-list"></div>
+    </div>
     <div class="empty" id="home-soon" hidden>This tab is coming soon.</div>
   </section>
 
@@ -261,6 +279,7 @@
   <audio id="audio" preload="metadata"></audio>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="preview.js"></script>
   <script src="app.js"></script>
   <script>
     window.addEventListener('load', () => {

@@ -68,9 +68,7 @@ document.querySelectorAll('#home-tabs button').forEach((btn) => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('#home-tabs button').forEach((b) => b.classList.remove('active'));
     btn.classList.add('active');
-    const isMusic = btn.dataset.htab === 'music';
-    $('home-music').hidden = !isMusic;
-    $('home-soon').hidden = isMusic;
+    showHomeTab(btn.dataset.htab);
   });
 });
 
@@ -928,5 +926,123 @@ async function loadProfileList() {
 // ==========================================================
 // START
 // ==========================================================
+// ==========================================================
+// HOME: ALBUM + PLAYLIST TABS
+// ==========================================================
+let homeTab = 'music';
+
+function showHomePanel(name) {
+  $('home-music').hidden = name !== 'music';
+  $('home-album').hidden = name !== 'album';
+  $('home-playlist').hidden = name !== 'playlist';
+  $('home-detail').hidden = name !== 'detail';
+  $('home-soon').hidden = name !== 'soon';
+}
+
+function showHomeTab(tab) {
+  homeTab = tab;
+  if (tab === 'music') showHomePanel('music');
+  else if (tab === 'album') { showHomePanel('album'); loadAlbumGrid(); }
+  else if (tab === 'playlist') { showHomePanel('playlist'); loadPlaylistGrid(); }
+  else showHomePanel('soon');
+}
+
+function buildCard(cover, title, sub, onClick) {
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.innerHTML = `
+    <img class="card-cover" src="${esc(cover)}" alt="">
+    <div class="card-title">${esc(title)}</div>
+    <div class="card-sub">${esc(sub)}</div>
+  `;
+  el.querySelector('img').addEventListener('error', (e) => { e.target.src = FALLBACK; }, { once: true });
+  el.addEventListener('click', onClick);
+  return el;
+}
+
+function openDetail(cover, title, sub, kind) {
+  $('detail-cover').src = cover;
+  $('detail-title').textContent = title;
+  $('detail-sub').textContent = sub;
+  $('detail-kind').textContent = kind;
+  $('detail-list').innerHTML = '<div class="loading">Loading…</div>';
+  showHomePanel('detail');
+  window.scrollTo(0, 0);
+}
+
+function fillDetailList(rows, fallbackCover) {
+  const wrap = $('detail-list');
+  if (!rows.length) { wrap.innerHTML = '<div class="empty">No songs here yet.</div>'; return; }
+  wrap.innerHTML = '';
+  rows.forEach((t) => {
+    const artistName = (t.artists && t.artists.name) || 'Unknown Artist';
+    wrap.appendChild(buildRow(t, artistName, t.cover_url || fallbackCover, null));
+  });
+  markActive();
+}
+
+$('detail-back').addEventListener('click', () => showHomeTab(homeTab));
+
+async function loadAlbumGrid() {
+  const grid = $('album-grid');
+  grid.innerHTML = '<div class="loading">Loading albums…</div>';
+  try {
+    const { data, error } = await db.from('albums')
+      .select('id, title, cover_url, release_date, artist_id, artists ( name )')
+      .order('created_at', { ascending: false }).limit(30);
+    if (error) throw error;
+    if (!data || !data.length) { grid.innerHTML = '<div class="empty">No albums yet.</div>'; return; }
+    grid.innerHTML = '';
+    data.forEach((al) => {
+      const artistName = (al.artists && al.artists.name) || 'Unknown Artist';
+      grid.appendChild(buildCard(al.cover_url || FALLBACK, al.title, artistName, () => openAlbum(al, artistName)));
+    });
+  } catch (err) {
+    console.error(err);
+    grid.innerHTML = '<div class="empty">Could not load albums.</div>';
+  }
+}
+
+async function openAlbum(al, artistName) {
+  const cover = al.cover_url || FALLBACK;
+  openDetail(cover, al.title, artistName + (al.release_date ? ' • ' + String(al.release_date).slice(0, 4) : ''), 'Album');
+  try {
+    const { data } = await db.from('tracks')
+      .select('id, title, audio_url, cover_url, plays, artist_id, album_id, artists ( name )')
+      .eq('album_id', al.id).order('created_at', { ascending: true });
+    fillDetailList(data || [], cover);
+  } catch (err) { console.error(err); fillDetailList([], cover); }
+}
+
+async function loadPlaylistGrid() {
+  const grid = $('playlist-grid');
+  grid.innerHTML = '<div class="loading">Loading playlists…</div>';
+  try {
+    const { data, error } = await db.from('playlists')
+      .select('id, name, cover_url')
+      .order('created_at', { ascending: false }).limit(30);
+    if (error) throw error;
+    if (!data || !data.length) { grid.innerHTML = '<div class="empty">No playlists yet.</div>'; return; }
+    grid.innerHTML = '';
+    data.forEach((pl) => {
+      grid.appendChild(buildCard(pl.cover_url || FALLBACK, pl.name, 'Playlist', () => openPlaylist(pl)));
+    });
+  } catch (err) {
+    console.error(err);
+    grid.innerHTML = '<div class="empty">No playlists yet.</div>';
+  }
+}
+
+async function openPlaylist(pl) {
+  const cover = pl.cover_url || FALLBACK;
+  openDetail(cover, pl.name, 'Playlist', 'Playlist');
+  try {
+    const { data } = await db.from('playlist_tracks')
+      .select('position, tracks ( id, title, audio_url, cover_url, plays, artist_id, artists ( name ) )')
+      .eq('playlist_id', pl.id).order('position', { ascending: true });
+    fillDetailList((data || []).map((r) => r.tracks).filter(Boolean), cover);
+  } catch (err) { console.error(err); fillDetailList([], cover); }
+}
+
 const startView = read('dropplay_view');
 showView(['home', 'search', 'library', 'studio'].includes(startView) ? startView : 'home');
