@@ -48,7 +48,9 @@
 
     <div class="section" id="home-music">
       <div class="section-header"><h2>Top Songs</h2></div>
-      <div id="track-list"><div class="loading">Loading tracks…</div></div>
+      <div id="track-list" class="song-columns"><div class="loading">Loading tracks…</div></div>
+      <div class="section-header" style="margin-top:26px;"><h2>Albums</h2></div>
+      <div class="h-scroll" id="home-albums-row"></div>
     </div>
     <div class="section" id="home-album" hidden>
       <div class="section-header"><h2>Albums</h2></div>
@@ -57,6 +59,14 @@
     <div class="section" id="home-playlist" hidden>
       <div class="section-header"><h2>Playlists</h2></div>
       <div class="card-grid" id="playlist-grid"></div>
+    </div>
+    <div class="section" id="home-podcast" hidden>
+      <div class="section-header"><h2>Podcasts</h2></div>
+      <div class="card-grid" id="podcast-grid"></div>
+    </div>
+    <div class="section" id="home-artist" hidden>
+      <div class="section-header"><h2>Artists</h2></div>
+      <div class="card-grid" id="artist-grid"></div>
     </div>
     <div class="section" id="home-detail" hidden>
       <button class="detail-back" id="detail-back" aria-label="Back"><svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></button>
@@ -99,7 +109,7 @@
     <header class="studio-head">
       <div class="studio-top">
         <button class="back-btn" id="studio-back" aria-label="Back">
-          <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+                <svg viewBox="0 0 24 24"><path d="M7 14.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zM17 12.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zM8.5 18V5.7L20.5 3.2V16h-2V8.1L10.5 9.8V18z"/></svg>
         </button>
         <div class="top-title">Artist Studio</div>
         <div class="top-badge">PRO</div>
@@ -235,8 +245,8 @@
   <!-- ================= BOTTOM NAV ================= -->
   <nav class="bottom-nav" id="bottom-nav">
     <button data-view="home" class="active">
-      <svg viewBox="0 0 24 24"><path d="M12 3l9 8h-3v9h-5v-6H11v6H6v-9H3z"/></svg>
-      Home
+      <svg viewBox="0 0 24 24"><path fill-rule="evenodd" d="M6 2h12a4 4 0 0 1 4 4v12a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4zM9.6 13.3a2.9 2.9 0 1 0 0 5.8 2.9 2.9 0 0 0 0-5.8zM12.5 16.2V6.2l5 1.6v2.5l-3.1-1v6.9z"/></svg>
+      Live
     </button>
     <button data-view="search">
       <svg viewBox="0 0 24 24"><path d="M10 2a8 8 0 105.29 14.01l4.35 4.35 1.41-1.41-4.35-4.35A8 8 0 0010 2zm0 2a6 6 0 110 12 6 6 0 010-12z"/></svg>

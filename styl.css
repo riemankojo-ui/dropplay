@@ -88,6 +88,25 @@ button { font-family: inherit; }
 /* ===== Album / Playlist cards ===== */
 .card-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
 .card { cursor: pointer; min-width: 0; }
+.card.round { text-align: center; }
+.h-scroll { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x proximity; padding-bottom: 6px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.h-scroll::-webkit-scrollbar { display: none; }
+.h-scroll { gap: 10px; }
+.h-scroll .card { flex: 0 0 100px; scroll-snap-align: start; }
+.h-scroll .card-title { font-size: 12px; margin-top: 6px; }
+.h-scroll .card-sub { font-size: 11px; }
+.h-scroll .card-cover { border-radius: 8px; }
+.card-menu { width: 24px; height: 24px; top: 4px; right: 4px; }
+.card-menu svg { width: 14px; height: 14px; }
+.h-scroll .loading, .h-scroll .empty { flex: 1; }
+.song-columns { display: grid; grid-auto-flow: column; grid-template-rows: repeat(5, auto); grid-auto-columns: 88%; column-gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; padding-bottom: 6px; }
+.song-columns::-webkit-scrollbar { display: none; }
+.song-columns .track { scroll-snap-align: start; }
+.song-columns .loading, .song-columns .empty { grid-row: 1 / span 5; }
+.song-card { position: relative; }
+.card-menu { position: absolute; top: 6px; right: 6px; width: 30px; height: 30px; border: 0; border-radius: 50%; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; }
+.card-menu svg { width: 18px; height: 18px; fill: #fff; }
+.card.round .card-cover { border-radius: 50%; }
 .card-cover { width: 100%; aspect-ratio: 1; border-radius: 10px; object-fit: cover; background: #333; display: block; }
 .card-title { font-weight: 700; font-size: 14px; margin-top: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card-sub { font-size: 12px; color: #b3b3b3; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -196,7 +215,7 @@ button { font-family: inherit; }
   cursor: pointer; height: 100%;
 }
 .bottom-nav button.active { color: #fff; }
-.bottom-nav svg { width: 22px; height: 22px; fill: currentColor; }
+.bottom-nav svg { width: 26px; height: 26px; fill: currentColor; }
 
 /* ===== Song options sheet ===== */
 .sheet-backdrop {
@@ -402,3 +421,20 @@ button { font-family: inherit; }
 .progress-track { width: 100%; height: 6px; background: #2a2a2a; border-radius: 6px; overflow: hidden; }
 .progress-bar { width: 0%; height: 100%; background: #1db954; transition: width 0.2s; }
 .progress-label { font-size: 12px; color: #888; margin-top: 8px; text-align: center; }
+
+/* ===== BRAND COLOR (change this one line to recolor the app) ===== */
+:root { --brand: #F4159B; }
+.top-tabs button.active { border-bottom-color: var(--brand); }
+.track-menu-btn.remove:hover svg { fill: var(--brand); }
+.empty a, .empty .link { color: var(--brand); }
+#add-local-btn { background: var(--brand); }
+.fp-seek { accent-color: var(--brand); }
+.top-badge { background: var(--brand); color: #fff; }
+.studio-tabs button.active { color: var(--brand); border-bottom-color: var(--brand); }
+.stat-value.green { color: var(--brand); }
+.recent-plays { color: var(--brand); }
+.audio-picker.has-file { border-color: var(--brand); background: #2a0e1f; }
+.audio-picker svg { fill: var(--brand); }
+.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--brand); }
+.primary-btn { background: var(--brand); color: #fff; }
+.progress-bar { background: var(--brand); }

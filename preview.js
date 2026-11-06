@@ -9,7 +9,12 @@
 // ?preview=1 this file does nothing and the app is real.
 // ==========================================================
 (function () {
-  if (new URLSearchParams(location.search).get('preview') !== '1') return;
+  // Set to true while working on layout inside Multi Bundle's Preview.
+  // Set back to false before you publish.
+  var FORCE_PREVIEW = true;
+  var onLive = location.hostname === 'dropplay-lake.vercel.app';
+  var wanted = new URLSearchParams(location.search).get('preview') === '1' || (FORCE_PREVIEW && !onLive);
+  if (!wanted) return;
 
   // Keep preview data apart from your real saved data
   var P = Storage.prototype;
@@ -19,7 +24,12 @@
   P.removeItem = function (k) { return _rem.call(this, 'pv_' + k); };
 
   // ----- cover pictures (made on the fly, no internet needed) -----
+  var photoCount = 0;
   function cover(a, b, label) {
+    photoCount++;
+    return 'https://picsum.photos/seed/dropplay' + photoCount + '/300/300';
+  }
+  function coverGradient(a, b, label) {
     var svg = "<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'>" +
       "<defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>" +
       "<stop offset='0' stop-color='" + a + "'/><stop offset='1' stop-color='" + b + "'/>" +
@@ -108,13 +118,38 @@
     ['Low Tide', 'ar6', 'al5', 21400, 233], ['Salt & Sun', 'ar6', 'al5', 14900, 277],
     ['Drift', 'ar6', 'al5', 8300, 208],
     ['City Lights', 'ar5', 'al6', 52300, 185], ['Midnight Run', 'ar5', 'al6', 33700, 165],
-    ['Take Me Out', 'ar5', null, 41500, 220], ['Echoes', 'ar1', null, 7600, 247]
+    ['Take Me Out', 'ar5', null, 41500, 220], ['Echoes', 'ar1', null, 7600, 247],
+    ['Back Road', 'ar2', null, 36400, 190], ['Blue Hour', 'ar3', null, 29800, 240],
+    ['Wildfire', 'ar4', null, 24300, 210], ['Homeward', 'ar6', null, 19700, 255],
+    ['Highway Hum', 'ar5', null, 45100, 175], ['Candlelight', 'ar1', null, 13200, 270],
+    ['Rooftops', 'ar2', null, 28900, 225], ['Easy Come', 'ar3', null, 10400, 200],
+    ['Concrete Sky', 'ar5', null, 37200, 180], ['Warm Static', 'ar4', null, 8800, 215],
+    ['Last Train', 'ar6', null, 22100, 245]
   ].forEach(function (t, i) {
     var album = t[2] ? DB.albums.filter(function (a) { return a.id === t[2]; })[0] : null;
     DB.tracks.push({
       id: 't' + (i + 1), title: t[0], artist_id: t[1], album_id: t[2], plays: t[3], _f: t[4],
-      cover_url: album ? album.cover_url : cover('#FDC830', '#F37335', t[0].charAt(0)),
+      cover_url: cover('#FDC830', '#F37335', t[0].charAt(0)),
       created_at: now - i * 3600000
+    });
+  });
+
+  DB.podcasts = [];
+  DB.episodes = [];
+  [
+    ['The Late Show Hustle', 'Marcus Cole'], ['Mind Over Music', 'Dr. Amara Bell'],
+    ['Studio Talk', 'DJ Femi'], ['Street Stories', 'Tola James'],
+    ['Beat Break', 'Kojo and Sam'], ['Night Owls', 'Lena Park']
+  ].forEach(function (p, i) {
+    var id = 'pc' + (i + 1);
+    var img = cover('#000', '#000', 'P');
+    DB.podcasts.push({ id: id, title: p[0], host: p[1], cover_url: img, created_at: now - i * 86400000 });
+    ['Getting Started', 'The Big Break', 'Behind the Mic', 'Lessons Learned'].forEach(function (name, n) {
+      DB.episodes.push({
+        id: id + 'e' + (n + 1), podcast_id: id, title: 'Ep ' + (n + 1) + ' \u00B7 ' + name,
+        host: p[1], plays: 900 + i * 310 + n * 120, _f: 150 + i * 20 + n * 10,
+        cover_url: img, created_at: now - (4 - n) * 86400000
+      });
     });
   });
 
@@ -249,7 +284,7 @@
   // Small badge so you always know you are in preview
   var badge = document.createElement('div');
   badge.textContent = 'PREVIEW';
-  badge.style.cssText = 'position:fixed;top:6px;right:8px;z-index:100000;pointer-events:none;' +
+  badge.style.cssText = 'position:fixed;bottom:150px;left:8px;z-index:100000;pointer-events:none;' +
     'background:#FFD60A;color:#121212;font:800 9px sans-serif;letter-spacing:1px;' +
     'padding:3px 7px;border-radius:999px;opacity:.9';
   document.body.appendChild(badge);

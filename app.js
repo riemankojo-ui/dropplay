@@ -54,7 +54,7 @@ function showView(name) {
   window.scrollTo(0, 0);
   store('dropplay_view', name);
 
-  if (name === 'home') loadTracks();
+  if (name === 'home') { loadTracks(); loadHomeAlbumsRow(); }
   if (name === 'library') renderLibrary();
   if (name === 'studio') loadStudioTab(currentStudioTab);
 }
@@ -207,12 +207,13 @@ async function loadTracks() {
     }
 
     // Do not rebuild the list if nothing changed (keeps taps from being lost)
-    const sig = JSON.stringify(data.map((t) => [t.id, t.title, t.cover_url, t.plays]));
+    const top = data.slice().sort((a, b) => (b.plays || 0) - (a.plays || 0)).slice(0, 20);
+    const sig = JSON.stringify(top.map((t) => [t.id, t.title, t.cover_url, t.plays]));
     if (sig === lastHomeSig && trackListEl.querySelector('.track')) return;
     lastHomeSig = sig;
 
     trackListEl.innerHTML = '';
-    data.forEach((track) => {
+    top.forEach((track) => {
       const artistName = (track.artists && track.artists.name) || 'Unknown Artist';
       const cover = track.cover_url || FALLBACK;
       trackListEl.appendChild(buildRow(track, artistName, cover, null));
@@ -849,10 +850,10 @@ async function loadAnalytics() {
     el.innerHTML = `
       <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;">
         <span style="font-weight:600;">${esc(t.title)}</span>
-        <span style="color:#1db954;font-weight:700;">${t.plays || 0} ▶</span>
+        <span style="color:var(--brand);font-weight:700;">${t.plays || 0} ▶</span>
       </div>
       <div style="background:#2a2a2a;height:6px;border-radius:6px;overflow:hidden;">
-        <div style="width:${pct}%;height:100%;background:#1db954;border-radius:6px;"></div>
+        <div style="width:${pct}%;height:100%;background:var(--brand);border-radius:6px;"></div>
       </div>
     `;
     wrap.appendChild(el);
@@ -935,6 +936,8 @@ function showHomePanel(name) {
   $('home-music').hidden = name !== 'music';
   $('home-album').hidden = name !== 'album';
   $('home-playlist').hidden = name !== 'playlist';
+  $('home-podcast').hidden = name !== 'podcast';
+  $('home-artist').hidden = name !== 'artist';
   $('home-detail').hidden = name !== 'detail';
   $('home-soon').hidden = name !== 'soon';
 }
@@ -944,12 +947,14 @@ function showHomeTab(tab) {
   if (tab === 'music') showHomePanel('music');
   else if (tab === 'album') { showHomePanel('album'); loadAlbumGrid(); }
   else if (tab === 'playlist') { showHomePanel('playlist'); loadPlaylistGrid(); }
+  else if (tab === 'podcast') { showHomePanel('podcast'); loadPodcastGrid(); }
+  else if (tab === 'artist') { showHomePanel('artist'); loadArtistGrid(); }
   else showHomePanel('soon');
 }
 
-function buildCard(cover, title, sub, onClick) {
+function buildCard(cover, title, sub, onClick, round) {
   const el = document.createElement('div');
-  el.className = 'card';
+  el.className = 'card' + (round ? ' round' : '');
   el.innerHTML = `
     <img class="card-cover" src="${esc(cover)}" alt="">
     <div class="card-title">${esc(title)}</div>
@@ -962,6 +967,7 @@ function buildCard(cover, title, sub, onClick) {
 
 function openDetail(cover, title, sub, kind) {
   $('detail-cover').src = cover;
+  $('detail-cover').style.borderRadius = kind === 'Artist' ? '50%' : '';
   $('detail-title').textContent = title;
   $('detail-sub').textContent = sub;
   $('detail-kind').textContent = kind;
@@ -1042,6 +1048,105 @@ async function openPlaylist(pl) {
       .eq('playlist_id', pl.id).order('position', { ascending: true });
     fillDetailList((data || []).map((r) => r.tracks).filter(Boolean), cover);
   } catch (err) { console.error(err); fillDetailList([], cover); }
+}
+
+async function loadPodcastGrid() {
+  const grid = $('podcast-grid');
+  grid.innerHTML = '<div class="loading">Loading podcasts…</div>';
+  try {
+    const { data, error } = await db.from('podcasts')
+      .select('id, title, host, cover_url')
+      .order('created_at', { ascending: false }).limit(30);
+    if (error) throw error;
+    if (!data || !data.length) { grid.innerHTML = '<div class="empty">No podcasts yet.</div>'; return; }
+    grid.innerHTML = '';
+    data.forEach((p) => {
+      grid.appendChild(buildCard(p.cover_url || FALLBACK, p.title, p.host || 'Podcast', () => openPodcast(p)));
+    });
+  } catch (err) {
+    console.error(err);
+    grid.innerHTML = '<div class="empty">No podcasts yet.</div>';
+  }
+}
+
+async function openPodcast(p) {
+  const cover = p.cover_url || FALLBACK;
+  openDetail(cover, p.title, p.host || 'Podcast', 'Podcast');
+  try {
+    const { data } = await db.from('episodes')
+      .select('id, title, audio_url, cover_url, plays, host')
+      .eq('podcast_id', p.id).order('created_at', { ascending: true });
+    fillDetailList((data || []).map((e) => Object.assign({}, e, { artists: { name: e.host || p.host || 'Podcast' } })), cover);
+  } catch (err) { console.error(err); fillDetailList([], cover); }
+}
+
+async function loadArtistGrid() {
+  const grid = $('artist-grid');
+  grid.innerHTML = '<div class="loading">Loading artists…</div>';
+  try {
+    const { data, error } = await db.from('artists')
+      .select('id, name, bio, image_url, verified')
+      .order('name', { ascending: true }).limit(50);
+    if (error) throw error;
+    if (!data || !data.length) { grid.innerHTML = '<div class="empty">No artists yet.</div>'; return; }
+    grid.innerHTML = '';
+    data.forEach((a) => {
+      grid.appendChild(buildCard(a.image_url || FALLBACK, a.name + (a.verified ? ' ✔' : ''), 'Artist', () => openArtist(a), true));
+    });
+  } catch (err) {
+    console.error(err);
+    grid.innerHTML = '<div class="empty">Could not load artists.</div>';
+  }
+}
+
+async function openArtist(a) {
+  const cover = a.image_url || FALLBACK;
+  openDetail(cover, a.name + (a.verified ? ' ✔' : ''), a.bio || 'Artist', 'Artist');
+  try {
+    const { data } = await db.from('tracks')
+      .select('id, title, audio_url, cover_url, plays, artist_id, artists ( name )')
+      .eq('artist_id', a.id).order('plays', { ascending: false });
+    fillDetailList(data || [], cover);
+  } catch (err) { console.error(err); fillDetailList([], cover); }
+}
+
+function buildSongCard(track, artistName, cover) {
+  const el = document.createElement('div');
+  el.className = 'card song-card';
+  el.dataset.id = track.id;
+  el.innerHTML = `
+    <img class="card-cover" src="${esc(cover)}" alt="">
+    <button class="card-menu" aria-label="More">${DOTS_SVG}</button>
+    <div class="card-title">${esc(track.title || 'Untitled')}</div>
+    <div class="card-sub">${esc(artistName)}</div>
+  `;
+  el.querySelector('img').addEventListener('error', (e) => { e.target.src = FALLBACK; }, { once: true });
+  el.addEventListener('click', (e) => {
+    if (e.target.closest('.card-menu')) return;
+    playTrack(track, artistName, cover);
+  });
+  el.querySelector('.card-menu').addEventListener('click', (e) => {
+    e.stopPropagation();
+    openSongSheet(track, artistName, cover);
+  });
+  return el;
+}
+
+async function loadHomeAlbumsRow() {
+  const row = $('home-albums-row');
+  if (!row) return;
+  try {
+    const { data, error } = await db.from('albums')
+      .select('id, title, cover_url, release_date, artist_id, artists ( name )')
+      .order('created_at', { ascending: false }).limit(10);
+    if (error) throw error;
+    if (!data || !data.length) { row.innerHTML = '<div class="empty">No albums yet.</div>'; return; }
+    row.innerHTML = '';
+    data.forEach((al) => {
+      const artistName = (al.artists && al.artists.name) || 'Unknown Artist';
+      row.appendChild(buildCard(al.cover_url || FALLBACK, al.title, artistName, () => openAlbum(al, artistName)));
+    });
+  } catch (err) { console.error(err); row.innerHTML = ''; }
 }
 
 const startView = read('dropplay_view');
